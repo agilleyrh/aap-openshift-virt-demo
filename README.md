@@ -24,6 +24,7 @@ playbooks/openshift/
   05-routes-and-ingress.yml        # Routes and ingress controllers
 
 playbooks/openshift-virt/
+  00-install-cnv.yml               # Install CNV operator (bootstrap demo)
   01-cnv-operator-status.yml       # CNV/HyperConverged operator status
   02-virtual-machines-inventory.yml
   03-vm-instances-status.yml       # Running VMIs
