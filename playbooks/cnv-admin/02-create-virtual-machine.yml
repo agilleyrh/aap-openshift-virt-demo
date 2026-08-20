@@ -1,0 +1,84 @@
+---
+- name: Create a virtual machine managed by AAP
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Verify CNV VirtualMachine CRD exists
+      kubernetes.core.k8s_info:
+        api_version: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        name: virtualmachines.kubevirt.io
+      register: vm_crd
+      failed_when: vm_crd.resources | length == 0
+      failed_msg: "OpenShift Virtualization is not installed. Run the CNV install playbook first."
+
+    - name: Create VirtualMachine
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: kubevirt.io/v1
+          kind: VirtualMachine
+          metadata:
+            name: "{{ virt_vm_name }}"
+            namespace: "{{ virt_namespace }}"
+            labels:
+              app.kubernetes.io/managed-by: aap
+              demo: cnv-admin
+          spec:
+            runStrategy: Halted
+            template:
+              metadata:
+                labels:
+                  kubevirt.io/vm: "{{ virt_vm_name }}"
+                  app.kubernetes.io/managed-by: aap
+              spec:
+                domain:
+                  devices:
+                    disks:
+                      - name: containerdisk
+                        disk:
+                          bus: virtio
+                      - name: cloudinitdisk
+                        disk:
+                          bus: virtio
+                    interfaces:
+                      - name: default
+                        masquerade: {}
+                  resources:
+                    requests:
+                      memory: "{{ virt_vm_memory }}"
+                      cpu: "{{ virt_vm_cpu | int }}"
+                networks:
+                  - name: default
+                    pod: {}
+                volumes:
+                  - name: containerdisk
+                    containerDisk:
+                      image: "{{ virt_container_image }}"
+                  - name: cloudinitdisk
+                    cloudInitNoCloud:
+                      userData: |
+                        #cloud-config
+                        password: redhat
+                        chpasswd: { expire: False }
+
+    - name: Display created VM
+      kubernetes.core.k8s_info:
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+      register: vm
+
+    - name: Show VM summary
+      ansible.builtin.debug:
+        msg:
+          vm: "{{ virt_vm_name }}"
+          namespace: "{{ virt_namespace }}"
+          run_strategy: "{{ vm.resources[0].spec.runStrategy | default('unknown') }}"
+          memory: "{{ virt_vm_memory }}"
+          cpu: "{{ virt_vm_cpu }}"

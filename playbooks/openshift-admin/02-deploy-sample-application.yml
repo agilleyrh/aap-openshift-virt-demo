@@ -1,0 +1,99 @@
+---
+- name: Deploy sample application to demo project
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Ensure demo project exists
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: "{{ demo_namespace }}"
+      register: ns
+      failed_when: ns.resources | length == 0
+
+    - name: Deploy application Deployment
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: "{{ demo_app_name }}"
+            namespace: "{{ demo_namespace }}"
+            labels:
+              app: "{{ demo_app_name }}"
+              app.kubernetes.io/managed-by: aap
+          spec:
+            replicas: "{{ demo_replicas | int }}"
+            selector:
+              matchLabels:
+                app: "{{ demo_app_name }}"
+            template:
+              metadata:
+                labels:
+                  app: "{{ demo_app_name }}"
+              spec:
+                containers:
+                  - name: web
+                    image: "{{ demo_image }}"
+                    ports:
+                      - containerPort: 8080
+                        name: http
+                    readinessProbe:
+                      httpGet:
+                        path: /
+                        port: 8080
+                      initialDelaySeconds: 5
+                      periodSeconds: 10
+
+    - name: Deploy ClusterIP Service
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: "{{ demo_app_name }}"
+            namespace: "{{ demo_namespace }}"
+            labels:
+              app: "{{ demo_app_name }}"
+              app.kubernetes.io/managed-by: aap
+          spec:
+            selector:
+              app: "{{ demo_app_name }}"
+            ports:
+              - name: http
+                port: 8080
+                targetPort: 8080
+
+    - name: Wait for deployment rollout
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ demo_app_name }}"
+        namespace: "{{ demo_namespace }}"
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 300
+
+    - name: Display deployment status
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ demo_app_name }}"
+        namespace: "{{ demo_namespace }}"
+      register: deploy
+
+    - name: Show rollout summary
+      ansible.builtin.debug:
+        msg:
+          deployment: "{{ demo_app_name }}"
+          namespace: "{{ demo_namespace }}"
+          replicas: "{{ deploy.resources[0].status.replicas | default(0) }}"
+          available: "{{ deploy.resources[0].status.availableReplicas | default(0) }}"

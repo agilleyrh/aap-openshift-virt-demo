@@ -1,0 +1,54 @@
+---
+- name: Restart a virtual machine
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Stop VM before restart
+      kubernetes.core.k8s:
+        state: patched
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+        definition:
+          spec:
+            runStrategy: Halted
+
+    - name: Pause to allow graceful shutdown
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Start VM after restart
+      kubernetes.core.k8s:
+        state: patched
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+        definition:
+          spec:
+            runStrategy: Always
+
+    - name: Wait for VM to return to Running or Scheduling
+      kubernetes.core.k8s_info:
+        api_version: kubevirt.io/v1
+        kind: VirtualMachineInstance
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+      register: vmi
+      until: >-
+        vmi.resources | length > 0 and
+        vmi.resources[0].status.phase in ['Running', 'Scheduling']
+      retries: 30
+      delay: 10
+      failed_when: false
+
+    - name: Show restart result
+      ansible.builtin.debug:
+        msg:
+          vm: "{{ virt_vm_name }}"
+          vmi_phase: "{{ vmi.resources[0].status.phase | default('not running yet') if vmi.resources | length > 0 else 'not running yet' }}"

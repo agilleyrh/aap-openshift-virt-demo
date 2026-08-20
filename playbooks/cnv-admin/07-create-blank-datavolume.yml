@@ -1,0 +1,65 @@
+---
+- name: Create blank DataVolume for VM storage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  vars:
+    datavolume_name: "{{ virt_vm_name }}-disk"
+    datavolume_size: 5Gi
+    storage_class: ocs-external-storagecluster-ceph-rbd
+
+  tasks:
+    - name: Verify DataVolume CRD exists
+      kubernetes.core.k8s_info:
+        api_version: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        name: datavolumes.cdi.kubevirt.io
+      register: dv_crd
+      failed_when: dv_crd.resources | length == 0
+
+    - name: Create blank DataVolume
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: cdi.kubevirt.io/v1beta1
+          kind: DataVolume
+          metadata:
+            name: "{{ datavolume_name }}"
+            namespace: "{{ virt_namespace }}"
+            labels:
+              app.kubernetes.io/managed-by: aap
+              vm: "{{ virt_vm_name }}"
+          spec:
+            source:
+              blank: {}
+            storage:
+              resources:
+                requests:
+                  storage: "{{ datavolume_size }}"
+              storageClassName: "{{ storage_class }}"
+
+    - name: Wait for DataVolume phase
+      kubernetes.core.k8s_info:
+        api_version: cdi.kubevirt.io/v1beta1
+        kind: DataVolume
+        name: "{{ datavolume_name }}"
+        namespace: "{{ virt_namespace }}"
+      register: dv
+      until: >-
+        dv.resources | length > 0 and
+        dv.resources[0].status.phase in ['Succeeded', 'PVC Bound', 'ImportScheduled', 'Pending']
+      retries: 30
+      delay: 10
+      failed_when: false
+
+    - name: Show DataVolume status
+      ansible.builtin.debug:
+        msg:
+          datavolume: "{{ datavolume_name }}"
+          namespace: "{{ virt_namespace }}"
+          phase: "{{ dv.resources[0].status.phase | default('unknown') }}"
+          size: "{{ datavolume_size }}"
+          storage_class: "{{ storage_class }}"

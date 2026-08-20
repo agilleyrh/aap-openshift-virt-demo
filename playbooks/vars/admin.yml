@@ -1,0 +1,25 @@
+---
+# Shared variables for OpenShift and CNV management playbooks
+demo_namespace: aap-demo
+demo_app_name: aap-demo-app
+demo_route_name: aap-demo
+demo_image: registry.redhat.io/ubi9/httpd-24:latest
+demo_replicas: 2
+
+virt_namespace: virt-demo
+virt_vm_name: aap-managed-cirros
+virt_vm_memory: 512Mi
+virt_vm_cpu: 1
+virt_container_image: quay.io/kubevirt/cirros-container-disk-demo
+
+operator_install_namespace: openshift-nmstate
+operator_package: kubernetes-nmstate-operator
+operator_channel: stable
+operator_source: redhat-operators
+operator_source_namespace: openshift-marketplace
+
+resource_quota_pods: "10"
+resource_quota_requests_cpu: "2"
+resource_quota_requests_memory: 4Gi
+
+network_policy_name: aap-demo-allow-same-namespace

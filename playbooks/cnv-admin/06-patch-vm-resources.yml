@@ -1,0 +1,55 @@
+---
+- name: Patch virtual machine CPU and memory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  vars:
+    virt_vm_memory: 1Gi
+    virt_vm_cpu: 2
+
+  tasks:
+    - name: Ensure VM is stopped before resource change
+      kubernetes.core.k8s:
+        state: patched
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+        definition:
+          spec:
+            runStrategy: Halted
+
+    - name: Patch VM resource requests
+      kubernetes.core.k8s:
+        state: patched
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+        definition:
+          spec:
+            template:
+              spec:
+                domain:
+                  resources:
+                    requests:
+                      memory: "{{ virt_vm_memory }}"
+                      cpu: "{{ virt_vm_cpu | int }}"
+
+    - name: Display updated VM resources
+      kubernetes.core.k8s_info:
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+      register: vm
+
+    - name: Show resource patch result
+      ansible.builtin.debug:
+        msg:
+          vm: "{{ virt_vm_name }}"
+          memory: "{{ vm.resources[0].spec.template.spec.domain.resources.requests.memory }}"
+          cpu: "{{ vm.resources[0].spec.template.spec.domain.resources.requests.cpu }}"

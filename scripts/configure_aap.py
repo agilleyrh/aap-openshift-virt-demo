@@ -84,7 +84,7 @@ def find_or_create_project():
         "/api/controller/v2/projects/",
         {
             "name": "OpenShift and Virt Demo",
-            "description": "Read-only playbooks for OpenShift and OpenShift Virtualization demos",
+            "description": "OpenShift and OpenShift Virtualization audit and management playbooks for AAP demos",
             "organization": ORG_ID,
             "scm_type": "git",
             "scm_url": SCM_URL,
@@ -136,7 +136,7 @@ def find_or_create_job_template(name, playbook, project_id, cred_id):
         "/api/controller/v2/job_templates/",
         {
             "name": name,
-            "description": f"Read-only demo: {playbook}",
+            "description": f"AAP demo playbook: {playbook}",
             "job_type": "run",
             "inventory": INVENTORY_ID,
             "project": project_id,
@@ -183,11 +183,14 @@ def find_or_create_workflow(name, description, job_template_ids):
     node_ids = []
     for jt_id in job_template_ids:
         jt = api_get(f"/api/controller/v2/job_templates/{jt_id}/")
-        label = (
-            jt["name"]
-            .replace("OCP Demo - ", "")
-            .replace("OCP Virt Demo - ", "")
-        )
+        label = jt["name"]
+        for prefix in (
+            "OCP Demo - ",
+            "OCP Virt Demo - ",
+            "OCP Admin - ",
+            "CNV Admin - ",
+        ):
+            label = label.replace(prefix, "")
         node = api_post(
             "/api/controller/v2/workflow_job_template_nodes/",
             {
@@ -260,5 +263,66 @@ if __name__ == "__main__":
     print(json.dumps({
         "credential_id": cred_id,
         "project_id": project_id,
-        "workflows": [wf_platform, wf_virt, wf_virt_bootstrap, wf_full],
+        "audit_workflows": [wf_platform, wf_virt, wf_virt_bootstrap, wf_full],
+    }, indent=2))
+
+    openshift_admin_jobs = [
+        ("OCP Admin - Ensure Demo Project", "playbooks/openshift-admin/01-ensure-demo-project.yml"),
+        ("OCP Admin - Deploy Sample Application", "playbooks/openshift-admin/02-deploy-sample-application.yml"),
+        ("OCP Admin - Expose Service Route", "playbooks/openshift-admin/03-expose-service-route.yml"),
+        ("OCP Admin - Apply Network Policy", "playbooks/openshift-admin/04-apply-network-policy.yml"),
+        ("OCP Admin - Configure Resource Quota", "playbooks/openshift-admin/05-configure-resource-quota.yml"),
+        ("OCP Admin - Create Service Account RBAC", "playbooks/openshift-admin/06-create-service-account-rbac.yml"),
+        ("OCP Admin - Scale Application", "playbooks/openshift-admin/07-scale-application.yml"),
+        ("OCP Admin - Check Cluster Updates", "playbooks/openshift-admin/08-check-cluster-updates.yml"),
+        ("OCP Admin - Install Cluster Operator", "playbooks/openshift-admin/09-install-cluster-operator.yml"),
+        ("OCP Admin - Manage Route Networking", "playbooks/openshift-admin/10-manage-route-networking.yml"),
+    ]
+    cnv_admin_jobs = [
+        ("CNV Admin - Ensure Virt Namespace", "playbooks/cnv-admin/01-ensure-virt-namespace.yml"),
+        ("CNV Admin - Create Virtual Machine", "playbooks/cnv-admin/02-create-virtual-machine.yml"),
+        ("CNV Admin - Start Virtual Machine", "playbooks/cnv-admin/03-start-virtual-machine.yml"),
+        ("CNV Admin - Stop Virtual Machine", "playbooks/cnv-admin/04-stop-virtual-machine.yml"),
+        ("CNV Admin - Restart Virtual Machine", "playbooks/cnv-admin/05-restart-virtual-machine.yml"),
+        ("CNV Admin - Patch VM Resources", "playbooks/cnv-admin/06-patch-vm-resources.yml"),
+        ("CNV Admin - Create Blank DataVolume", "playbooks/cnv-admin/07-create-blank-datavolume.yml"),
+        ("CNV Admin - Delete Virtual Machine", "playbooks/cnv-admin/08-delete-virtual-machine.yml"),
+    ]
+
+    ocp_admin_ids = []
+    for name, pb in openshift_admin_jobs:
+        ocp_admin_ids.append(find_or_create_job_template(name, pb, project_id, cred_id))
+
+    cnv_admin_ids = []
+    for name, pb in cnv_admin_jobs:
+        cnv_admin_ids.append(find_or_create_job_template(name, pb, project_id, cred_id))
+
+    wf_app = find_or_create_workflow(
+        "WF - OpenShift App Deploy and Expose",
+        "Create demo project, deploy application, expose route, and tune route networking.",
+        [ocp_admin_ids[0], ocp_admin_ids[1], ocp_admin_ids[2], ocp_admin_ids[9]],
+    )
+    wf_governance = find_or_create_workflow(
+        "WF - OpenShift Governance and RBAC",
+        "Apply network policy, resource quotas, and RBAC in the demo project.",
+        [ocp_admin_ids[0], ocp_admin_ids[3], ocp_admin_ids[4], ocp_admin_ids[5]],
+    )
+    wf_platform_admin = find_or_create_workflow(
+        "WF - OpenShift Operator and Updates",
+        "Review cluster updates and install a networking operator from OperatorHub.",
+        [ocp_admin_ids[7], ocp_admin_ids[8]],
+    )
+    wf_cnv_lifecycle = find_or_create_workflow(
+        "WF - CNV Virtual Machine Lifecycle",
+        "Create, start, resize, and stop an AAP-managed virtual machine.",
+        [cnv_admin_ids[0], cnv_admin_ids[1], cnv_admin_ids[2], cnv_admin_ids[5], cnv_admin_ids[3]],
+    )
+    wf_full_admin = find_or_create_workflow(
+        "WF - Full Platform Management Demo",
+        "End-to-end OpenShift application deployment plus CNV virtual machine lifecycle.",
+        ocp_admin_ids[:4] + [ocp_admin_ids[9]] + cnv_admin_ids[:4] + [cnv_admin_ids[5]],
+    )
+
+    print(json.dumps({
+        "admin_workflows": [wf_app, wf_governance, wf_platform_admin, wf_cnv_lifecycle, wf_full_admin],
     }, indent=2))

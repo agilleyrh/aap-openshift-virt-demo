@@ -1,75 +1,94 @@
 # AAP OpenShift and OpenShift Virtualization Demo
 
-Read-only Ansible Automation Platform content for demonstrating how AAP can audit and manage OpenShift clusters and OpenShift Virtualization (KubeVirt/CNV) workloads.
-
-All playbooks use **`kubernetes.core.k8s_info`** and other read-only modules. Nothing in this repository creates, updates, or deletes cluster resources.
-
-## Research basis
-
-This content is based on Red Hat and community guidance, including:
-
-- [kubernetes.core collection](https://github.com/ansible-collections/kubernetes.core)
-- [Ansible Content Collection for Red Hat OpenShift (`redhat.openshift`)](https://www.redhat.com/en/blog/introducing-the-ansible-content-collection-for-red-hat-openshift)
-- [AAP for OpenShift Virtualization in multi-cluster environments](https://www.redhat.com/en/blog/ansible-automation-platform-openshift-virtualization-multi-cluster-environment)
-- Community references such as [openshift-virt-ansible-automation](https://github.com/tosin2013/openshift-virt-ansible-automation) and [awx-kubevirt-demo](https://codeberg.org/jlh/awx-kubevirt-demo)
+Ansible Automation Platform content for demonstrating how AAP can **audit** and **fully manage** OpenShift clusters and OpenShift Virtualization (CNV) workloads through the Kubernetes API.
 
 ## Repository layout
 
-```
-playbooks/openshift/
-  01-cluster-overview.yml          # Nodes, cluster version
-  02-cluster-operators.yml         # ClusterOperator health
-  03-projects-and-quotas.yml       # Projects, quotas, limits
-  04-workload-health.yml           # Deployments/pods in key namespaces
-  05-routes-and-ingress.yml        # Routes and ingress controllers
+### Audit playbooks (read-only)
 
-playbooks/openshift-virt/
-  00-install-cnv.yml               # Install CNV operator (bootstrap demo)
-  01-cnv-operator-status.yml       # CNV/HyperConverged operator status
-  02-virtual-machines-inventory.yml
-  03-vm-instances-status.yml       # Running VMIs
-  04-storage-and-datavolumes.yml   # DataVolumes and virt PVCs
-  05-vm-templates-inventory.yml    # Instance types and templates
 ```
+playbooks/openshift/               # Cluster health, operators, projects, routes
+playbooks/openshift-virt/          # CNV status, VM inventory, storage, templates
+```
+
+### Management playbooks (mutating)
+
+```
+playbooks/openshift-admin/
+  01-ensure-demo-project.yml       # Create/labeled demo project
+  02-deploy-sample-application.yml # Deploy UBI httpd deployment + service
+  03-expose-service-route.yml      # Create edge TLS route
+  04-apply-network-policy.yml      # Namespace network policy
+  05-configure-resource-quota.yml  # Quota and limit range
+  06-create-service-account-rbac.yml
+  07-scale-application.yml         # Scale deployment replicas
+  08-check-cluster-updates.yml     # ClusterVersion and available updates
+  09-install-cluster-operator.yml  # Install NMState operator (configurable)
+  10-manage-route-networking.yml   # Route annotations and TLS tuning
+
+playbooks/cnv-admin/
+  01-ensure-virt-namespace.yml
+  02-create-virtual-machine.yml
+  03-start-virtual-machine.yml
+  04-stop-virtual-machine.yml
+  05-restart-virtual-machine.yml
+  06-patch-vm-resources.yml
+  07-create-blank-datavolume.yml
+  08-delete-virtual-machine.yml
+```
+
+Shared variables live in `playbooks/vars/demo.yml` and `playbooks/vars/admin.yml`.
 
 ## Prerequisites
 
 - Ansible Automation Platform 2.4+ with `kubernetes.core` in the execution environment
-- OpenShift or Kubernetes API credential attached to each job template
-- Cluster admin or read-only RBAC (`cluster-reader` + virt view permissions)
+- **OpenShift knmpg Cluster** credential attached to each job template
+- Cluster-admin token for management playbooks
 
-### Credential
-
-Attach an **OpenShift or Kubernetes API Bearer Token** credential with:
-
-- **Host:** `https://api.<cluster>:6443`
-- **Bearer token:** valid service account or user token
-- **Verify SSL:** enabled (provide CA if needed)
-
-AAP injects `K8S_AUTH_HOST`, `K8S_AUTH_API_KEY`, and related variables automatically.
-
-## Local testing
+## Configure AAP
 
 ```bash
-export K8S_AUTH_HOST="https://api.cluster.example:6443"
-export K8S_AUTH_API_KEY="<token>"
-export K8S_AUTH_VERIFY_SSL=yes
-
-ansible-galaxy collection install -r requirements.yml
-ansible-playbook playbooks/openshift/01-cluster-overview.yml
+export AAP_MCP_TOKEN=<aap-token>
+export OCP_TOKEN=<openshift-token>
+python3 scripts/configure_aap.py
 ```
 
-## OpenShift Virtualization note
+This creates job templates and workflows in the **Default** organization.
 
-If OpenShift Virtualization is not installed, virt playbooks exit gracefully and report that CNV CRDs are missing. Install the **kubevirt-hyperconverged** operator to populate VM inventory playbooks.
+## Audit workflows
 
-## Demo workflows in AAP
+| Workflow | Purpose |
+|----------|---------|
+| WF - OpenShift Platform Audit | Read-only OpenShift cluster audit |
+| WF - OpenShift Virtualization Audit | Read-only CNV/VM audit |
+| WF - OpenShift Virtualization Bootstrap and Audit | Install CNV, then audit |
+| WF - Full OpenShift and Virt Demo | Complete read-only story |
 
-Three workflow job templates are created in the **Default** organization:
+## Management workflows
 
-1. **WF - OpenShift Platform Audit** — all `playbooks/openshift/*` jobs
-2. **WF - OpenShift Virtualization Audit** — all `playbooks/openshift-virt/*` jobs
-3. **WF - Full OpenShift and Virt Demo** — platform audit, then virtualization audit
+| Workflow | Purpose |
+|----------|---------|
+| WF - OpenShift App Deploy and Expose | Project → app → route → route tuning |
+| WF - OpenShift Governance and RBAC | NetworkPolicy, quota, RBAC |
+| WF - OpenShift Operator and Updates | Cluster updates + operator install |
+| WF - CNV Virtual Machine Lifecycle | Create → start → resize → stop VM |
+| WF - Full Platform Management Demo | OpenShift app deployment + CNV lifecycle |
+
+## Suggested management demo flow
+
+1. **WF - OpenShift App Deploy and Expose** — show project creation, workload deployment, public route
+2. **WF - OpenShift Governance and RBAC** — network policy, quotas, least-privilege SA
+3. **WF - OpenShift Operator and Updates** — available cluster updates + NMState operator install
+4. **WF - CNV Virtual Machine Lifecycle** — full VM day-2 operations via AAP
+
+Override variables at launch with extra vars, for example:
+
+```yaml
+demo_namespace: aap-demo
+demo_replicas: 3
+virt_vm_name: aap-managed-cirros
+operator_package: kubernetes-nmstate-operator
+```
 
 ## License
 

@@ -1,0 +1,48 @@
+---
+- name: Start a virtual machine
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Set VM runStrategy to Always
+      kubernetes.core.k8s:
+        state: patched
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+        definition:
+          spec:
+            runStrategy: Always
+
+    - name: Wait for VirtualMachineInstance to reach Running phase
+      kubernetes.core.k8s_info:
+        api_version: kubevirt.io/v1
+        kind: VirtualMachineInstance
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+      register: vmi
+      until: >-
+        vmi.resources | length > 0 and
+        vmi.resources[0].status.phase in ['Running', 'Scheduling']
+      retries: 30
+      delay: 10
+      failed_when: false
+
+    - name: Display VM power state
+      kubernetes.core.k8s_info:
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+      register: vm
+
+    - name: Show start result
+      ansible.builtin.debug:
+        msg:
+          vm: "{{ virt_vm_name }}"
+          printable_status: "{{ vm.resources[0].status.printableStatus | default('unknown') }}"
+          vmi_phase: "{{ vmi.resources[0].status.phase | default('not running yet') if vmi.resources | length > 0 else 'not running yet' }}"

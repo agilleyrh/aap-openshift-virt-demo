@@ -1,0 +1,46 @@
+---
+- name: Scale demo application deployment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Scale deployment replicas
+      kubernetes.core.k8s:
+        state: patched
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ demo_app_name }}"
+        namespace: "{{ demo_namespace }}"
+        definition:
+          spec:
+            replicas: "{{ demo_replicas | int }}"
+
+    - name: Wait for scaled deployment
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ demo_app_name }}"
+        namespace: "{{ demo_namespace }}"
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 300
+
+    - name: Show scaled deployment
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ demo_app_name }}"
+        namespace: "{{ demo_namespace }}"
+      register: deploy
+
+    - name: Display replica counts
+      ansible.builtin.debug:
+        msg:
+          deployment: "{{ demo_app_name }}"
+          desired_replicas: "{{ deploy.resources[0].spec.replicas }}"
+          available_replicas: "{{ deploy.resources[0].status.availableReplicas | default(0) }}"

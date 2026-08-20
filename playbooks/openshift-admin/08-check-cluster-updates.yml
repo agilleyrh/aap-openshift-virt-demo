@@ -1,0 +1,35 @@
+---
+- name: Check OpenShift cluster version and available updates
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Get ClusterVersion
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: ClusterVersion
+        name: version
+      register: cluster_version
+
+    - name: Summarize current cluster version
+      ansible.builtin.set_fact:
+        cv: "{{ cluster_version.resources[0] }}"
+
+    - name: Display cluster update status
+      ansible.builtin.debug:
+        msg:
+          current_version: "{{ cv.status.history[0].version | default('unknown') }}"
+          desired_version: "{{ cv.spec.desiredUpdate.version | default(cv.status.desired.version | default('none')) }}"
+          update_available: "{{ (cv.status.availableUpdates | default([]) | length) > 0 }}"
+          available_updates: "{{ cv.status.availableUpdates | default([]) | map(attribute='version') | list }}"
+          conditions: "{{ cv.status.conditions | map(attribute='type') | list }}"
+
+    - name: Show update channel configuration
+      ansible.builtin.debug:
+        msg:
+          channel: "{{ cv.spec.channel | default('unknown') }}"
+          upstream: "{{ cv.spec.upstream | default('default') }}"
+          capabilities: "{{ cv.status.capabilities | default({}) }}"

@@ -1,0 +1,36 @@
+---
+- name: Ensure OpenShift Virtualization demo namespace
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Create virt demo namespace
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ virt_namespace }}"
+            labels:
+              app.kubernetes.io/managed-by: aap
+              demo: cnv-admin
+              kubevirt.io: ""
+            annotations:
+              openshift.io/description: "AAP-managed namespace for OpenShift Virtualization demos"
+
+    - name: Display namespace status
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: "{{ virt_namespace }}"
+      register: ns
+
+    - name: Show namespace details
+      ansible.builtin.debug:
+        msg:
+          namespace: "{{ virt_namespace }}"
+          labels: "{{ ns.resources[0].metadata.labels }}"

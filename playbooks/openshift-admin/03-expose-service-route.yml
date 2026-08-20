@@ -1,0 +1,49 @@
+---
+- name: Expose demo application with an OpenShift Route
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Create or update Route
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: route.openshift.io/v1
+          kind: Route
+          metadata:
+            name: "{{ demo_route_name }}"
+            namespace: "{{ demo_namespace }}"
+            labels:
+              app: "{{ demo_app_name }}"
+              app.kubernetes.io/managed-by: aap
+            annotations:
+              haproxy.router.openshift.io/rewrite-target: /
+          spec:
+            to:
+              kind: Service
+              name: "{{ demo_app_name }}"
+              weight: 100
+            port:
+              targetPort: http
+            tls:
+              termination: edge
+              insecureEdgeTerminationPolicy: Redirect
+
+    - name: Retrieve route details
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        name: "{{ demo_route_name }}"
+        namespace: "{{ demo_namespace }}"
+      register: route
+
+    - name: Display public route URL
+      ansible.builtin.debug:
+        msg:
+          route: "{{ demo_route_name }}"
+          host: "{{ route.resources[0].spec.host }}"
+          url: "https://{{ route.resources[0].spec.host }}"
+          tls: edge

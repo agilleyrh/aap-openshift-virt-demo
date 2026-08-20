@@ -1,0 +1,46 @@
+---
+- name: Manage route TLS and networking annotations
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  vars:
+    route_timeout: 30s
+    route_balance: roundrobin
+
+  tasks:
+    - name: Patch route annotations and TLS settings
+      kubernetes.core.k8s:
+        state: patched
+        api_version: route.openshift.io/v1
+        kind: Route
+        name: "{{ demo_route_name }}"
+        namespace: "{{ demo_namespace }}"
+        definition:
+          metadata:
+            annotations:
+              haproxy.router.openshift.io/timeout: "{{ route_timeout }}"
+              haproxy.router.openshift.io/balance: "{{ route_balance }}"
+              app.kubernetes.io/managed-by: aap
+          spec:
+            tls:
+              termination: edge
+              insecureEdgeTerminationPolicy: Redirect
+
+    - name: Retrieve updated route
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        name: "{{ demo_route_name }}"
+        namespace: "{{ demo_namespace }}"
+      register: route
+
+    - name: Display route networking configuration
+      ansible.builtin.debug:
+        msg:
+          host: "{{ route.resources[0].spec.host }}"
+          annotations: "{{ route.resources[0].metadata.annotations }}"
+          tls_termination: "{{ route.resources[0].spec.tls.termination }}"
+          insecure_policy: "{{ route.resources[0].spec.tls.insecureEdgeTerminationPolicy }}"

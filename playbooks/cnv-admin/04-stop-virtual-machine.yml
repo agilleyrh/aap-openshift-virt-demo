@@ -1,0 +1,46 @@
+---
+- name: Stop a virtual machine
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Set VM runStrategy to Halted
+      kubernetes.core.k8s:
+        state: patched
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+        definition:
+          spec:
+            runStrategy: Halted
+
+    - name: Wait for VirtualMachineInstance removal
+      kubernetes.core.k8s_info:
+        api_version: kubevirt.io/v1
+        kind: VirtualMachineInstance
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+      register: vmi
+      until: vmi.resources | length == 0
+      retries: 30
+      delay: 5
+      failed_when: false
+
+    - name: Display stopped VM status
+      kubernetes.core.k8s_info:
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+      register: vm
+
+    - name: Show stop result
+      ansible.builtin.debug:
+        msg:
+          vm: "{{ virt_vm_name }}"
+          printable_status: "{{ vm.resources[0].status.printableStatus | default('Stopped') }}"
+          vmi_present: "{{ vmi.resources | length > 0 }}"

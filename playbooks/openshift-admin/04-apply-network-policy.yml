@@ -1,0 +1,57 @@
+---
+- name: Apply network policy for demo namespace
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Create namespace network policy
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: "{{ network_policy_name }}"
+            namespace: "{{ demo_namespace }}"
+            labels:
+              app.kubernetes.io/managed-by: aap
+          spec:
+            podSelector: {}
+            policyTypes:
+              - Ingress
+              - Egress
+            ingress:
+              - from:
+                  - podSelector: {}
+            egress:
+              - to:
+                  - namespaceSelector:
+                      matchLabels:
+                        kubernetes.io/metadata.name: openshift-dns
+                ports:
+                  - protocol: UDP
+                    port: 53
+                  - protocol: TCP
+                    port: 53
+              - to:
+                  - ipBlock:
+                      cidr: 0.0.0.0/0
+
+    - name: Display applied network policy
+      kubernetes.core.k8s_info:
+        api_version: networking.k8s.io/v1
+        kind: NetworkPolicy
+        name: "{{ network_policy_name }}"
+        namespace: "{{ demo_namespace }}"
+      register: np
+
+    - name: Show policy summary
+      ansible.builtin.debug:
+        msg:
+          network_policy: "{{ network_policy_name }}"
+          namespace: "{{ demo_namespace }}"
+          ingress_rules: "{{ np.resources[0].spec.ingress | length }}"
+          egress_rules: "{{ np.resources[0].spec.egress | length }}"

@@ -1,0 +1,50 @@
+---
+- name: Ensure OpenShift demo project exists
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Create or update demo project
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: project.openshift.io/v1
+          kind: Project
+          metadata:
+            name: "{{ demo_namespace }}"
+            labels:
+              app.kubernetes.io/managed-by: aap
+              demo: openshift-admin
+            annotations:
+              openshift.io/description: "AAP-managed demo project for cluster administration demos"
+              openshift.io/display-name: "AAP Demo Application Project"
+
+    - name: Label namespace for monitoring and network policies
+      kubernetes.core.k8s:
+        state: patched
+        kind: Namespace
+        name: "{{ demo_namespace }}"
+        definition:
+          metadata:
+            labels:
+              pod-security.kubernetes.io/enforce: baseline
+              pod-security.kubernetes.io/audit: baseline
+              pod-security.kubernetes.io/warn: baseline
+              aap-demo: "true"
+
+    - name: Report project status
+      kubernetes.core.k8s_info:
+        api_version: project.openshift.io/v1
+        kind: Project
+        name: "{{ demo_namespace }}"
+      register: project_info
+
+    - name: Display project details
+      ansible.builtin.debug:
+        msg:
+          project: "{{ demo_namespace }}"
+          phase: "{{ project_info.resources[0].status.phase }}"
+          labels: "{{ project_info.resources[0].metadata.labels }}"

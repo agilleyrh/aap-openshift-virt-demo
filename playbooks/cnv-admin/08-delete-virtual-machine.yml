@@ -1,0 +1,33 @@
+---
+- name: Delete AAP-managed virtual machine
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/admin.yml
+
+  tasks:
+    - name: Delete VirtualMachine
+      kubernetes.core.k8s:
+        state: absent
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+        wait: true
+        wait_timeout: 180
+
+    - name: Confirm VM removal
+      kubernetes.core.k8s_info:
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+        name: "{{ virt_vm_name }}"
+        namespace: "{{ virt_namespace }}"
+      register: vm
+
+    - name: Show deletion result
+      ansible.builtin.debug:
+        msg:
+          vm: "{{ virt_vm_name }}"
+          namespace: "{{ virt_namespace }}"
+          deleted: "{{ vm.resources | length == 0 }}"
