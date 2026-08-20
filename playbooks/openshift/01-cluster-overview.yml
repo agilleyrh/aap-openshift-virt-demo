@@ -1,0 +1,48 @@
+---
+- name: OpenShift Cluster Overview (Read-Only)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Gather cluster version information
+      kubernetes.core.k8s_cluster_info:
+      register: cluster_info
+
+    - name: Display cluster API versions
+      ansible.builtin.debug:
+        msg:
+          - "Cluster connection: {{ cluster_info.connection['discovered'].host | default('unknown') }}"
+          - "Kubernetes version: {{ cluster_info.version.server.kubernetes.gitVersion | default('unknown') }}"
+          - "Platform: {{ cluster_info.version.server.kubernetes.platform | default('unknown') }}"
+
+    - name: List cluster nodes
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+      register: nodes
+
+    - name: Summarize node health
+      ansible.builtin.debug:
+        msg:
+          total_nodes: "{{ nodes.resources | length }}"
+          ready_nodes: "{{ nodes.resources | selectattr('status.conditions', 'defined') | list | length }}"
+          node_names: "{{ nodes.resources | map(attribute='metadata.name') | list }}"
+
+    - name: Collect node conditions
+      ansible.builtin.set_fact:
+        node_summary: >-
+          {{
+            node_summary | default([]) + [{
+              'name': item.metadata.name,
+              'ready': (item.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('Unknown')),
+              'roles': item.metadata.labels | dict2items | selectattr('key', 'match', 'node-role.kubernetes.io/.*') | map(attribute='key') | list
+            }]
+          }}
+      loop: "{{ nodes.resources }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"
+
+    - name: Display node readiness details
+      ansible.builtin.debug:
+        var: node_summary

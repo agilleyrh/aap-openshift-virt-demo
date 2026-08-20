@@ -1,0 +1,77 @@
+---
+- name: OpenShift Workload Health Summary (Read-Only)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    target_namespaces:
+      - openshift
+      - aap
+      - kube-system
+      - default
+
+  tasks:
+    - name: Gather deployments in selected namespaces
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: "{{ item }}"
+      loop: "{{ target_namespaces }}"
+      register: deployments_by_ns
+      failed_when: false
+
+    - name: Summarize deployments per namespace
+      ansible.builtin.debug:
+        msg:
+          namespace: "{{ item.item }}"
+          deployments: "{{ item.resources | default([]) | length }}"
+          unavailable: >-
+            {{
+              item.resources | default([])
+              | selectattr('status.unavailableReplicas', 'defined')
+              | selectattr('status.unavailableReplicas', 'gt', 0)
+              | map(attribute='metadata.name')
+              | list
+            }}
+      loop: "{{ deployments_by_ns.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Gather pods in selected namespaces
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ item }}"
+      loop: "{{ target_namespaces }}"
+      register: pods_by_ns
+      failed_when: false
+
+    - name: Summarize pod phases per namespace
+      ansible.builtin.debug:
+        msg:
+          namespace: "{{ item.item }}"
+          total_pods: "{{ item.resources | default([]) | length }}"
+          running: "{{ item.resources | default([]) | selectattr('status.phase', 'equalto', 'Running') | list | length }}"
+          pending: "{{ item.resources | default([]) | selectattr('status.phase', 'equalto', 'Pending') | list | length }}"
+          failed: "{{ item.resources | default([]) | selectattr('status.phase', 'equalto', 'Failed') | list | length }}"
+      loop: "{{ pods_by_ns.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Report non-running pods
+      ansible.builtin.debug:
+        msg:
+          namespace: "{{ item.metadata.namespace }}"
+          pod: "{{ item.metadata.name }}"
+          phase: "{{ item.status.phase }}"
+      loop: >-
+        {{
+          pods_by_ns.results
+          | map(attribute='resources')
+          | flatten
+          | rejectattr('status.phase', 'equalto', 'Running')
+          | list
+        }}
+      loop_control:
+        label: "{{ item.metadata.namespace }}/{{ item.metadata.name }}"

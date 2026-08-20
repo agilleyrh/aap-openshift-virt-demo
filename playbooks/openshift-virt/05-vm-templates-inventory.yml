@@ -1,0 +1,56 @@
+---
+- name: OpenShift Virtualization Templates Inventory (Read-Only)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Verify VirtualMachineClusterInstancetype CRD exists
+      kubernetes.core.k8s_info:
+        api_version: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        name: virtualmachineclusterinstancetypes.instancetype.kubevirt.io
+      register: instancetype_crd
+      failed_when: false
+
+    - name: List VirtualMachineClusterInstancetypes
+      kubernetes.core.k8s_info:
+        api_version: instancetype.kubevirt.io/v1beta1
+        kind: VirtualMachineClusterInstancetype
+      register: instancetypes
+      when: instancetype_crd.resources | length > 0
+      failed_when: false
+
+    - name: Summarize cluster instance types
+      ansible.builtin.debug:
+        msg:
+          instance_types: "{{ instancetypes.resources | default([]) | map(attribute='metadata.name') | list | sort }}"
+      when: instancetypes.resources is defined
+
+    - name: List common VM templates in openshift namespace
+      kubernetes.core.k8s_info:
+        api_version: template.openshift.io/v1
+        kind: Template
+        namespace: openshift
+        label_selectors:
+          - template.kubevirt.io
+      register: vm_templates
+      failed_when: false
+
+    - name: Summarize VM templates
+      ansible.builtin.debug:
+        msg:
+          templates_found: "{{ vm_templates.resources | default([]) | length }}"
+          template_names: "{{ vm_templates.resources | default([]) | map(attribute='metadata.name') | list | sort }}"
+
+    - name: List VirtualMachine preferences (defaults)
+      kubernetes.core.k8s_info:
+        api_version: instancetype.kubevirt.io/v1beta1
+        kind: VirtualMachineClusterPreference
+      register: preferences
+      failed_when: false
+
+    - name: Summarize VM preferences
+      ansible.builtin.debug:
+        msg:
+          preferences: "{{ preferences.resources | default([]) | map(attribute='metadata.name') | list | sort }}"

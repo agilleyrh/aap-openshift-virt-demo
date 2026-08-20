@@ -1,0 +1,68 @@
+---
+- name: OpenShift Virtualization Operator Status (Read-Only)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Check if VirtualMachine CRD exists
+      kubernetes.core.k8s_info:
+        api_version: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        name: virtualmachines.kubevirt.io
+      register: vm_crd
+      failed_when: false
+
+    - name: Report CNV API availability
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            'OpenShift Virtualization CRDs are present. CNV/KubeVirt API is available.'
+            if (vm_crd.resources | length) > 0
+            else 'OpenShift Virtualization is NOT installed on this cluster. Virt playbooks will report empty inventories until CNV is deployed.'
+          }}
+
+    - name: List HyperConverged operator subscriptions
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: Subscription
+        namespace: "{{ cnv_operator_namespace }}"
+      register: cnv_subscriptions
+      failed_when: false
+
+    - name: Summarize CNV subscriptions
+      ansible.builtin.debug:
+        msg:
+          namespace: "{{ cnv_operator_namespace }}"
+          subscriptions_found: "{{ cnv_subscriptions.resources | default([]) | length }}"
+          channels: "{{ cnv_subscriptions.resources | default([]) | map(attribute='spec.channel') | list }}"
+          installed_csv: "{{ cnv_subscriptions.resources | default([]) | map(attribute='status.installedCSV') | list }}"
+      when: cnv_subscriptions.resources is defined
+
+    - name: Get HyperConverged custom resource
+      kubernetes.core.k8s_info:
+        api_version: hco.kubevirt.io/v1beta1
+        kind: HyperConverged
+      register: hyperconverged
+      failed_when: false
+
+    - name: Summarize HyperConverged status
+      ansible.builtin.debug:
+        msg:
+          hyperconverged_instances: "{{ hyperconverged.resources | default([]) | map(attribute='metadata.name') | list }}"
+          conditions: "{{ hyperconverged.resources | default([]) | map(attribute='status.conditions') | list }}"
+      when: hyperconverged.resources is defined
+
+    - name: List KubeVirt operator CSVs
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+      register: all_csvs
+      failed_when: false
+
+    - name: Show virtualization-related operator packages
+      ansible.builtin.debug:
+        msg: "{{ item.metadata.name }} ({{ item.status.phase | default('Unknown') }})"
+      loop: "{{ all_csvs.resources | default([]) | selectattr('metadata.name', 'search', '(?i)virt|kubevirt|cnv|hyperconverged') | list }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"

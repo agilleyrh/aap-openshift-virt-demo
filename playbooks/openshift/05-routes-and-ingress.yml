@@ -1,0 +1,43 @@
+---
+- name: OpenShift Routes and Ingress Summary (Read-Only)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: List OpenShift routes
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+      register: routes
+
+    - name: Summarize routes
+      ansible.builtin.debug:
+        msg:
+          total_routes: "{{ routes.resources | length }}"
+          secure_routes: "{{ routes.resources | selectattr('spec.tls', 'defined') | list | length }}"
+
+    - name: Display route host mapping
+      ansible.builtin.debug:
+        msg:
+          namespace: "{{ item.metadata.namespace }}"
+          name: "{{ item.metadata.name }}"
+          host: "{{ item.spec.host }}"
+          service: "{{ item.spec.to.name | default('n/a') }}"
+          tls: "{{ 'yes' if item.spec.tls is defined else 'no' }}"
+      loop: "{{ routes.resources | sort(attribute='metadata.namespace') }}"
+      loop_control:
+        label: "{{ item.metadata.namespace }}/{{ item.metadata.name }}"
+
+    - name: Get ingress controller status
+      kubernetes.core.k8s_info:
+        api_version: operator.openshift.io/v1
+        kind: IngressController
+        namespace: openshift-ingress-operator
+      register: ingress_controllers
+      failed_when: false
+
+    - name: Summarize ingress controllers
+      ansible.builtin.debug:
+        msg:
+          ingress_controllers: "{{ ingress_controllers.resources | default([]) | map(attribute='metadata.name') | list }}"

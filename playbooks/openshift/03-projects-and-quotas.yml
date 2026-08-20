@@ -1,0 +1,43 @@
+---
+- name: OpenShift Projects and Resource Quotas (Read-Only)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: List OpenShift projects
+      kubernetes.core.k8s_info:
+        api_version: project.openshift.io/v1
+        kind: Project
+      register: projects
+
+    - name: Summarize projects
+      ansible.builtin.debug:
+        msg:
+          total_projects: "{{ projects.resources | length }}"
+          active_projects: "{{ projects.resources | selectattr('status.phase', 'equalto', 'Active') | list | length }}"
+          sample_projects: "{{ projects.resources | map(attribute='metadata.name') | list | sort | batch(10) | first }}"
+
+    - name: List resource quotas across all namespaces
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ResourceQuota
+      register: quotas
+
+    - name: Summarize resource quotas
+      ansible.builtin.debug:
+        msg:
+          total_quotas: "{{ quotas.resources | length }}"
+          namespaces_with_quotas: "{{ quotas.resources | map(attribute='metadata.namespace') | unique | list | sort }}"
+
+    - name: List limit ranges across all namespaces
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: LimitRange
+      register: limit_ranges
+
+    - name: Summarize limit ranges
+      ansible.builtin.debug:
+        msg:
+          total_limit_ranges: "{{ limit_ranges.resources | length }}"
+          namespaces_with_limits: "{{ limit_ranges.resources | map(attribute='metadata.namespace') | unique | list | sort }}"

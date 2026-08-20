@@ -1,0 +1,48 @@
+---
+- name: OpenShift Cluster Operators Health (Read-Only)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Get ClusterOperator resources
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: ClusterOperator
+      register: cluster_operators
+
+    - name: Build operator health summary
+      ansible.builtin.set_fact:
+        operator_health: >-
+          {{
+            operator_health | default([]) + [{
+              'name': item.metadata.name,
+              'available': item.status.conditions | selectattr('type', 'equalto', 'Available') | map(attribute='status') | first | default('Unknown'),
+              'degraded': item.status.conditions | selectattr('type', 'equalto', 'Degraded') | map(attribute='status') | first | default('Unknown'),
+              'version': item.status.versions | default([]) | map(attribute='version') | first | default('n/a')
+            }]
+          }}
+      loop: "{{ cluster_operators.resources }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"
+
+    - name: Display operator health summary
+      ansible.builtin.debug:
+        var: operator_health
+
+    - name: Identify degraded or unavailable operators
+      ansible.builtin.set_fact:
+        unhealthy_operators: >-
+          {{
+            operator_health | selectattr('available', 'ne', 'True') | list
+            + operator_health | selectattr('degraded', 'equalto', 'True') | list
+          }}
+
+    - name: Report unhealthy operators
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            'All cluster operators are healthy.'
+            if (unhealthy_operators | length) == 0
+            else unhealthy_operators
+          }}

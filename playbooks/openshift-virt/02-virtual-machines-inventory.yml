@@ -1,0 +1,44 @@
+---
+- name: OpenShift Virtualization VM Inventory (Read-Only)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Verify VirtualMachine CRD is available
+      kubernetes.core.k8s_info:
+        api_version: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        name: virtualmachines.kubevirt.io
+      register: vm_crd
+
+    - name: Stop with guidance when CNV is not installed
+      ansible.builtin.debug:
+        msg: "Skipping VM inventory: virtualmachines.kubevirt.io CRD not found. Install OpenShift Virtualization to populate this report."
+      when: vm_crd.resources | length == 0
+
+    - name: List all VirtualMachine objects
+      kubernetes.core.k8s_info:
+        api_version: kubevirt.io/v1
+        kind: VirtualMachine
+      register: virtual_machines
+      when: vm_crd.resources | length > 0
+
+    - name: Summarize VirtualMachine inventory
+      ansible.builtin.debug:
+        msg:
+          total_vms: "{{ virtual_machines.resources | length }}"
+          namespaces: "{{ virtual_machines.resources | map(attribute='metadata.namespace') | unique | list | sort }}"
+      when: virtual_machines.resources is defined
+
+    - name: Display VM run strategy and template hints
+      ansible.builtin.debug:
+        msg:
+          namespace: "{{ item.metadata.namespace }}"
+          name: "{{ item.metadata.name }}"
+          run_strategy: "{{ item.spec.runStrategy | default(item.spec.running | default('n/a')) }}"
+          template: "{{ item.metadata.labels | dict2items | selectattr('key', 'equalto', 'vm.kubevirt.io/template') | map(attribute='value') | first | default('custom') }}"
+      loop: "{{ virtual_machines.resources | default([]) }}"
+      loop_control:
+        label: "{{ item.metadata.namespace }}/{{ item.metadata.name }}"
+      when: virtual_machines.resources is defined
