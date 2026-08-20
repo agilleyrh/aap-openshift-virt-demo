@@ -28,7 +28,7 @@
               app: "{{ demo_app_name }}"
               app.kubernetes.io/managed-by: aap
           spec:
-            replicas: {{ demo_replicas | int }}
+            replicas: 2
             selector:
               matchLabels:
                 app: "{{ demo_app_name }}"

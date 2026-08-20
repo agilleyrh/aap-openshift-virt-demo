@@ -7,6 +7,10 @@
     - ../vars/admin.yml
 
   tasks:
+    - name: Normalize VM sizing variables
+      ansible.builtin.set_fact:
+        vm_cpu_cores: "{{ virt_vm_cpu | int }}"
+
     - name: Verify CNV VirtualMachine CRD exists
       kubernetes.core.k8s_info:
         api_version: apiextensions.k8s.io/v1
@@ -54,7 +58,7 @@
                   resources:
                     requests:
                       memory: "{{ virt_vm_memory }}"
-                      cpu: {{ virt_vm_cpu | int }}
+                      cpu: "{{ vm_cpu_cores }}"
                 networks:
                   - name: default
                     pod: {}
