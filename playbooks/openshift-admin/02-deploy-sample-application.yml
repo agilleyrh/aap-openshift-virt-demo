@@ -47,8 +47,8 @@
                       httpGet:
                         path: /
                         port: 8080
-                      initialDelaySeconds: 5
-                      periodSeconds: 10
+                      initialDelaySeconds: 3
+                      periodSeconds: 5
 
     - name: Deploy ClusterIP Service
       kubernetes.core.k8s:
@@ -80,7 +80,9 @@
         wait_condition:
           type: Available
           status: "True"
-        wait_timeout: 300
+        wait_timeout: 120
+      register: rollout
+      failed_when: false
 
     - name: Display deployment status
       kubernetes.core.k8s_info:

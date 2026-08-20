@@ -3,7 +3,7 @@
 demo_namespace: aap-demo
 demo_app_name: aap-demo-app
 demo_route_name: aap-demo
-demo_image: registry.redhat.io/ubi9/httpd-24:latest
+demo_image: quay.io/nginx/nginx-unprivileged:stable
 demo_replicas: 2
 
 virt_namespace: virt-demo
