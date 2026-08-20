@@ -1,0 +1,11 @@
+---
+demo_mode: read_only
+cnv_operator_namespace: openshift-cnv
+kubevirt_cr_name: kubevirt-kubevirt-hyperconverged
+target_namespaces:
+  - openshift
+  - aap
+  - kube-system
+  - default
+  - virt-demo
+  - openshift-cnv

@@ -3,13 +3,11 @@
   hosts: localhost
   connection: local
   gather_facts: false
+  vars_files:
+    - ../vars/demo.yml
 
   vars:
-    target_namespaces:
-      - openshift
-      - aap
-      - kube-system
-      - default
+    target_namespaces: "{{ target_namespaces }}"
 
   tasks:
     - name: Gather deployments in selected namespaces

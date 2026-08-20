@@ -3,6 +3,8 @@
   hosts: localhost
   connection: local
   gather_facts: false
+  vars_files:
+    - ../vars/demo.yml
 
   tasks:
     - name: Verify VirtualMachine CRD is available

@@ -123,11 +123,13 @@ def find_or_create_job_template(name, playbook, project_id, cred_id):
                     "project": project_id,
                     "inventory": INVENTORY_ID,
                     "execution_environment": EE_ID,
-                    "credentials": [cred_id],
                     "ask_variables_on_launch": False,
                     "diff_mode": False,
                 },
             )
+            creds = api_get(f"/api/controller/v2/job_templates/{jt['id']}/credentials/")
+            if not any(c["id"] == cred_id for c in creds.get("results", [])):
+                api_post(f"/api/controller/v2/job_templates/{jt['id']}/credentials/", {"id": cred_id})
             print(f"Updated job template id={jt['id']} name={name}")
             return jt["id"]
     jt = api_post(
@@ -140,12 +142,12 @@ def find_or_create_job_template(name, playbook, project_id, cred_id):
             "project": project_id,
             "playbook": playbook,
             "execution_environment": EE_ID,
-            "credentials": [cred_id],
             "organization": ORG_ID,
             "ask_variables_on_launch": False,
             "diff_mode": False,
         },
     )
+    api_post(f"/api/controller/v2/job_templates/{jt['id']}/credentials/", {"id": cred_id})
     print(f"Created job template id={jt['id']} name={name}")
     return jt["id"]
 
