@@ -181,11 +181,17 @@ def find_or_create_workflow(name, description, job_template_ids):
             api("DELETE", f"/api/controller/v2/workflow_job_template_nodes/{node['id']}/")
 
     node_ids = []
-    for idx, jt_id in enumerate(job_template_ids):
+    for jt_id in job_template_ids:
+        jt = api_get(f"/api/controller/v2/job_templates/{jt_id}/")
+        label = (
+            jt["name"]
+            .replace("OCP Demo - ", "")
+            .replace("OCP Virt Demo - ", "")
+        )
         node = api_post(
             "/api/controller/v2/workflow_job_template_nodes/",
             {
-                "identifier": f"node-{idx+1}",
+                "identifier": label,
                 "workflow_job_template": wjt_id,
                 "unified_job_template": jt_id,
             },
