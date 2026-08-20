@@ -13,8 +13,11 @@
         kind: CustomResourceDefinition
         name: virtualmachines.kubevirt.io
       register: vm_crd
-      failed_when: vm_crd.resources | length == 0
-      failed_msg: "OpenShift Virtualization is not installed. Run the CNV install playbook first."
+
+    - name: Fail when OpenShift Virtualization is not installed
+      ansible.builtin.fail:
+        msg: "OpenShift Virtualization is not installed. Run the CNV install playbook first."
+      when: vm_crd.resources | length == 0
 
     - name: Create VirtualMachine
       kubernetes.core.k8s:
@@ -51,7 +54,7 @@
                   resources:
                     requests:
                       memory: "{{ virt_vm_memory }}"
-                      cpu: "{{ virt_vm_cpu | int }}"
+                      cpu: {{ virt_vm_cpu | int }}
                 networks:
                   - name: default
                     pod: {}
