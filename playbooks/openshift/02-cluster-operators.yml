@@ -48,3 +48,8 @@
             if (unhealthy_operators | length) == 0
             else unhealthy_operators
           }}
+
+    - name: Display full operator list when requested
+      ansible.builtin.debug:
+        var: operator_health
+      when: show_healthy_operators | default('yes') == 'yes'

@@ -6,11 +6,6 @@
   vars_files:
     - ../vars/admin.yml
 
-  vars:
-    datavolume_name: "{{ virt_vm_name }}-disk"
-    datavolume_size: 5Gi
-    storage_class: ocs-external-storagecluster-ceph-rbd
-
   tasks:
     - name: Verify DataVolume CRD exists
       kubernetes.core.k8s_info:

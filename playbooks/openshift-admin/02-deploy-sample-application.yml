@@ -70,6 +70,14 @@
                 port: 8080
                 targetPort: 8080
 
+    - name: Scale deployment to requested replica count
+      kubernetes.core.k8s_scale:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ demo_app_name }}"
+        namespace: "{{ demo_namespace }}"
+        replicas: "{{ demo_replicas | int }}"
+
     - name: Wait for deployment rollout
       kubernetes.core.k8s_info:
         api_version: apps/v1

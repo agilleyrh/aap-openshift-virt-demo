@@ -24,7 +24,12 @@
           current_version: "{{ cv.status.history[0].version | default('unknown') }}"
           desired_version: "{{ cv.spec.desiredUpdate.version | default(cv.status.desired.version | default('none')) }}"
           update_available: "{{ (cv.status.availableUpdates | default([]) | length) > 0 }}"
-          available_updates: "{{ cv.status.availableUpdates | default([]) | map(attribute='version') | list }}"
+          available_updates: >-
+            {{
+              cv.status.availableUpdates | default([]) | map(attribute='version') | list
+              if (show_available_updates | default('yes')) == 'yes'
+              else ['hidden by survey option']
+            }}
           conditions: "{{ cv.status.conditions | map(attribute='type') | list }}"
 
     - name: Show update channel configuration

@@ -23,6 +23,7 @@
       kubernetes.core.k8s_info:
         api_version: cdi.kubevirt.io/v1beta1
         kind: DataVolume
+        namespace: "{{ virt_namespace if (virt_scope | default('namespace')) == 'namespace' else omit }}"
       register: datavolumes
       when: dv_crd.resources | length > 0
 

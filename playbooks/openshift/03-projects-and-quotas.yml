@@ -16,9 +16,18 @@
     - name: Summarize projects
       ansible.builtin.debug:
         msg:
-          total_projects: "{{ projects.resources | length }}"
-          active_projects: "{{ projects.resources | selectattr('status.phase', 'equalto', 'Active') | list | length }}"
-          sample_projects: "{{ projects.resources | map(attribute='metadata.name') | list | sort | batch(10) | first }}"
+          total_projects: "{{ filtered_projects | length }}"
+          active_projects: "{{ filtered_projects | selectattr('status.phase', 'equalto', 'Active') | list | length }}"
+          sample_projects: "{{ filtered_projects | map(attribute='metadata.name') | list | sort | batch(10) | first }}"
+      vars:
+        filtered_projects: >-
+          {{
+            projects.resources
+            if (project_name_filter | default('') | length) == 0
+            else projects.resources
+              | selectattr('metadata.name', 'search', project_name_filter)
+              | list
+          }}
 
     - name: List resource quotas across all namespaces
       kubernetes.core.k8s_info:

@@ -19,10 +19,11 @@
         msg: "Skipping VM inventory: virtualmachines.kubevirt.io CRD not found. Install OpenShift Virtualization to populate this report."
       when: vm_crd.resources | length == 0
 
-    - name: List all VirtualMachine objects
+    - name: List VirtualMachine objects
       kubernetes.core.k8s_info:
         api_version: kubevirt.io/v1
         kind: VirtualMachine
+        namespace: "{{ virt_namespace if (virt_scope | default('namespace')) == 'namespace' else omit }}"
       register: virtual_machines
       when: vm_crd.resources | length > 0
 

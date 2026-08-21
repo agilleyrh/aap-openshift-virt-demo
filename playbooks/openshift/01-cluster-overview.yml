@@ -48,3 +48,4 @@
     - name: Display node readiness details
       ansible.builtin.debug:
         var: node_summary
+      when: include_node_roles | default('yes') == 'yes'

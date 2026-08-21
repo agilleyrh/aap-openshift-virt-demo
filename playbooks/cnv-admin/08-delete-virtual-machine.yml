@@ -7,6 +7,11 @@
     - ../vars/admin.yml
 
   tasks:
+    - name: Require explicit confirmation before delete
+      ansible.builtin.fail:
+        msg: "Set Confirm Delete to yes in the survey to delete {{ virt_vm_name }}."
+      when: confirm_delete | default('no') != 'yes'
+
     - name: Delete VirtualMachine
       kubernetes.core.k8s:
         state: absent

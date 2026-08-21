@@ -27,7 +27,14 @@
           host: "{{ item.spec.host }}"
           service: "{{ item.spec.to.name | default('n/a') }}"
           tls: "{{ 'yes' if item.spec.tls is defined else 'no' }}"
-      loop: "{{ routes.resources | sort(attribute='metadata.namespace') }}"
+      loop: >-
+        {{
+          routes.resources
+          | selectattr('metadata.namespace', 'equalto', route_namespace_filter)
+          | list
+          if (route_namespace_filter | default('') | length) > 0
+          else routes.resources
+        }}
       loop_control:
         label: "{{ item.metadata.namespace }}/{{ item.metadata.name }}"
 

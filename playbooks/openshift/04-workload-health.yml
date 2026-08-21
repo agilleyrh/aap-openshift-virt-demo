@@ -7,15 +7,24 @@
     - ../vars/demo.yml
 
   vars:
-    target_namespaces: "{{ target_namespaces }}"
+    target_namespaces_effective: "{{ target_namespaces }}"
 
   tasks:
+    - name: Normalize namespace list from survey input
+      ansible.builtin.set_fact:
+        target_namespaces_effective: >-
+          {{
+            target_namespaces.split(',') | map('trim') | list
+            if target_namespaces is string
+            else target_namespaces
+          }}
+
     - name: Gather deployments in selected namespaces
       kubernetes.core.k8s_info:
         api_version: apps/v1
         kind: Deployment
         namespace: "{{ item }}"
-      loop: "{{ target_namespaces }}"
+      loop: "{{ target_namespaces_effective }}"
       register: deployments_by_ns
       failed_when: false
 
@@ -41,7 +50,7 @@
         api_version: v1
         kind: Pod
         namespace: "{{ item }}"
-      loop: "{{ target_namespaces }}"
+      loop: "{{ target_namespaces_effective }}"
       register: pods_by_ns
       failed_when: false
 

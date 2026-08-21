@@ -6,10 +6,6 @@
   vars_files:
     - ../vars/admin.yml
 
-  vars:
-    route_timeout: 30s
-    route_balance: roundrobin
-
   tasks:
     - name: Patch route annotations and TLS settings
       kubernetes.core.k8s:

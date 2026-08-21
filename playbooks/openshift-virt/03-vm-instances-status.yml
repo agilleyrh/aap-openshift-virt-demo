@@ -19,10 +19,11 @@
         msg: "Skipping VMI status: virtualmachineinstances.kubevirt.io CRD not found."
       when: vmi_crd.resources | length == 0
 
-    - name: List all VirtualMachineInstance objects
+    - name: List VirtualMachineInstance objects
       kubernetes.core.k8s_info:
         api_version: kubevirt.io/v1
         kind: VirtualMachineInstance
+        namespace: "{{ virt_namespace if (virt_scope | default('namespace')) == 'namespace' else omit }}"
       register: vmis
       when: vmi_crd.resources | length > 0
 

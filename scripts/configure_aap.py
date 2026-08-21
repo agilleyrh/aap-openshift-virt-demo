@@ -326,3 +326,7 @@ if __name__ == "__main__":
     print(json.dumps({
         "admin_workflows": [wf_app, wf_governance, wf_platform_admin, wf_cnv_lifecycle, wf_full_admin],
     }, indent=2))
+
+    from configure_aap_surveys import configure_surveys
+    survey_result = configure_surveys()
+    print(json.dumps({"surveys_configured": len(survey_result)}, indent=2))

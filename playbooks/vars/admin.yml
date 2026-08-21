@@ -23,3 +23,13 @@ resource_quota_requests_cpu: "2"
 resource_quota_requests_memory: 4Gi
 
 network_policy_name: aap-demo-allow-same-namespace
+
+sa_name: aap-demo-automation
+role_name: aap-demo-viewer
+
+route_timeout: 30s
+route_balance: roundrobin
+
+datavolume_name: aap-managed-cirros-disk
+datavolume_size: 5Gi
+storage_class: ocs-external-storagecluster-ceph-rbd

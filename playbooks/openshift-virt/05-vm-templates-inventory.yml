@@ -29,11 +29,11 @@
           instance_types: "{{ instancetypes.resources | default([]) | map(attribute='metadata.name') | list | sort }}"
       when: instancetypes.resources is defined
 
-    - name: List common VM templates in openshift namespace
+    - name: List common VM templates
       kubernetes.core.k8s_info:
         api_version: template.openshift.io/v1
         kind: Template
-        namespace: openshift
+        namespace: "{{ template_namespace | default('openshift') }}"
         label_selectors:
           - template.kubevirt.io
       register: vm_templates
