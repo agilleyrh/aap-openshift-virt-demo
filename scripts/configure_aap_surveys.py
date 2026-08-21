@@ -51,7 +51,7 @@ def q_integer(variable, question_name, default, required=False, description=""):
         "question_description": description,
         "type": "integer",
         "required": required,
-        "default": str(default),
+        "default": int(default),
     }
 
 
@@ -140,7 +140,7 @@ SURVEYS = {
                 "target_namespaces",
                 "Target Namespaces",
                 NS_CHOICES,
-                "openshift,aap,kube-system,default,aap-demo",
+                "openshift\naap\nkube-system\naap-demo",
                 True,
                 "Namespaces scanned for Deployments and Pods.",
             ),
